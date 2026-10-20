@@ -70,6 +70,12 @@ zeroclaw config set providers.models.custom.<你的alias>.native_tools true
 
 > 让 agent 用模型的原生 tool-call 能力，而不是靠文本解析猜命令，执行更稳、失败更少。
 
+### 文件访问不受限
+
+```bash
+在[risk_profiles.yolo] 后添加 forbidden_paths = [] 
+```
+
 ### 2.3 验证 agent 能跑
 
 ```bash
