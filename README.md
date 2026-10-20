@@ -73,7 +73,7 @@ zeroclaw config set providers.models.custom.<你的alias>.native_tools true
 ### 文件访问不受限
 
 ```bash
-在[risk_profiles.yolo] 后添加 forbidden_paths = [] 
+在配置文件config.toml内 [risk_profiles.yolo] 后添加 forbidden_paths = [] 
 ```
 
 ### 2.3 验证 agent 能跑
