@@ -1,13 +1,14 @@
 # 用钉钉远程操控服务器 · 通用部署文档
 
 > **效果**：在钉钉里 @机器人 发**中文** → 服务器上的 AI agent 理解并执行 → 结果以 markdown 卡片回传；发 **`!命令`** → 直跑 shell，秒回。
+> 
 > **适用**：任何能出网的 Linux 服务器（云服务器、VPS、内网机器都行），不需要公网 IP、域名、HTTPS 证书。
 
 ---
 
-## 零、开始前：准备这 5 样东西
+## 开始前：准备 5 样东西
 
-| # | 需要什么 | 说明 |
+|   | 需要什么 | 说明 |
 |---|---|---|
 | 1 | 一台 Linux 服务器 | Ubuntu / Debian / CentOS 都行，能访问外网即可 |
 | 2 | 钉钉开放平台账号 | 有权限创建「企业内部应用」（个人也能创建） |
@@ -41,7 +42,7 @@
 
 ---
 
-## 二、安装 zeroclaw（可选，但推荐）
+## 二、安装 zeroclaw
 
 它负责"中文 → 理解意图 → 执行命令"，是这个方案的大脑。
 
@@ -79,6 +80,12 @@ zeroclaw config set providers.models.custom.<你的alias>.native_tools true
 ### 2.3 验证 agent 能跑
 
 ```bash
+# 把 .cargo/bin 加到 PATH（以后直接输 zeroclaw 就能跑）
+echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+```bash
 zeroclaw agent -a <AGENT_NAME> -m "报一下当前时间和系统负载"
 ```
 
@@ -94,7 +101,9 @@ zeroclaw agent -a <AGENT_NAME> -m "报一下当前时间和系统负载"
 2. **事件订阅 → 推送方式**：选「**Stream 模式推送**」→ 保存。（bot 跑起来后这里会显示绿色「✅ 连接接入成功」）
 3. **版本发布**：任何改动都要点「版本管理与发布 → 发布」，顶部黄条「版本发布后，当前修改才能生效」消失才算生效。**这步最容易漏。**
 4. **拿凭据**：凭据与基础信息页里的 **Client ID** 和 **Client Secret**，就是前面那两个变量。
-
+```bash
+权限开通：Card.Streaming.Write  Card.Instance.Write  qyapi_robot_sendmsg
+```
 ---
 
 ## 四、部署 bot（核心）
@@ -221,42 +230,21 @@ journalctl -u dingbot -f      # 实时日志（每条指令都会打印 [msg]）
 systemctl restart dingbot     # 改了 bot.py 或 zeroclaw 配置后执行
 systemctl status dingbot
 ```
-
-### 6.4 只想执行命令，不用 AI？
-
-不装 zeroclaw 也能用：钉钉只发 `!` 开头的命令即可（脚本里 `!df -h` 那条路径不依赖 zeroclaw）。想彻底去掉 AI 依赖，把脚本里 else 分支改成直接执行 `text` 就行。
-
----
-
-## 七、踩坑记录（排查先看这里）
-
-| 现象 | 真相 / 解法 |
-|---|---|
-| 连上后**静默卡死、无报错** | websockets 17.x 与 dingtalk-stream 不兼容，`pip3 install "websockets<14"` 降级即可 |
-| `curl https://wss-open-connection-union.dingtalk.com:443/connect` 返回 400 | **这就是通的**（该地址只收 WebSocket）；返回 000/超时才是网络问题 |
-| 云服务器要不要开安全组端口 | 不用。Stream 是**出站**连接，安全组管的是入站 |
-| 日志刷 `unknown message topic, topic=ping` | 心跳包，正常 |
-| 钉钉发消息机器人没反应 | ① 应用没发布新版本（黄条还在）② 推送方式不是 Stream ③ 群聊里没 @机器人 |
-| `zeroclaw agent -a ops "文本"` 报 unexpected argument | 单次模式要用 `-m` |
-| systemd 下报 zeroclaw 找不到 | PATH 不含 cargo 目录，脚本里用绝对路径并在 env 显式传 PATH |
-| `zeroclaw status` 显示 DingTalk `not compiled` | 正常，钉钉通道由本文的 bot 负责，不需要编译它 |
-| 内存小（≤2G）的机器 | 如果哪天真要编译 Rust，先加 2G swap：`fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile` |
-
----
-
-## 八、附录：一键复用清单
-
 ```bash
-# 1) 装 zeroclaw
-curl -fsSL https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/master/install.sh | sh
+# 查看有哪些agent
+zeroclaw agents list
 
-# 2) 装 bot 依赖
-pip3 install --break-system-packages dingtalk-stream "websockets<14"
+# 删除不用的 agent
+zeroclaw agents delete <AGENT_NAME> --yes
 
-# 3) 写脚本（替换 4 个占位符后）→ 见 4.2
+# 启动聊天
+zeroclaw agent -a <AGENT_NAME>
 
-# 4) 常驻
-systemctl enable --now dingbot
+# 查询运行的agent进程
+pgrep -af zeroclaw
+
+# 强制关闭它
+kill -9 查到的PID
 ```
 
 **文件位置**：`/opt/dingtalk-bot/bot.py`、`/etc/systemd/system/dingbot.service`
