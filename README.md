@@ -176,7 +176,8 @@ PYEOF
 python3 -m py_compile /opt/dingtalk-bot/bot.py && echo "语法 OK"
 ```
 
-> 非 root 用户：把脚本里 `HOME` 和 systemd 里的 `ExecStart` 路径改成自己的家目录，`/root/.cargo/bin` 改成 `$(echo $CARGO_HOME)/bin` 的实际值。
+>  <HOME_DIR> 为当前 WSL 用户家目录，执行 echo $HOME 获取；<ZEROCLAW_PATH> 是 zeroclaw 二进制完整绝对路径，用 which zeroclaw 查询；<AGENT_NAME> 是 agent 别名，由 zeroclaw agent --list 列出；以上脚本无法识别图片发送文件，若需要将脚本改成项目中的bot.py
+
 
 ### 4.3 手动测试
 
