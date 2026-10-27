@@ -143,8 +143,8 @@ TIMEOUT_VISION = 120
 
 # 进度提示：长任务沉默太久用户会以为挂了，到点主动报一下还在跑
 PROGRESS_HINT = True
-PROGRESS_AFTER = 60                      # 超过 60s 发第一条「还在跑」
-PROGRESS_EVERY = 120                     # 之后每 120s 再报一次
+PROGRESS_AFTER = 120                     # 超过 120s（2 分钟）发第一条「还在跑」
+PROGRESS_EVERY = 180                     # 之后每 180s（3 分钟）再报一次
 PROGRESS_MAX = 10                        # 单任务最多报几条
 
 # 同时执行的长任务上限（超出只提示，避免线程池被占满后心跳线程都排不上）
@@ -249,7 +249,7 @@ def run(cmd, timeout, on_tick=None, tick_after=0, tick_every=0, tick_max=0):
                     on_tick(int(now - t0))
                 except Exception as e:
                     print("[tick] 进度回调失败: %s" % e, flush=True)
-                nxt = now + tick_every
+                nxt = t0 + tick_after + ticks * tick_every   # 按起点算绝对时刻，避免逐次漂移
             time.sleep(0.4)
         if not timed_out:               # 主进程已退出，兜底等一下，防孙进程还在写文件
             try:
@@ -806,7 +806,9 @@ class Bot(dingtalk_stream.ChatbotHandler):
             return None
 
         def cb(elapsed):
-            self._text(msg, "⏳ %s 还在跑（已 %ds），完成后会自动回复。" % (what, elapsed))
+            # 耗时按「分:秒」显示，避免长任务里一串 4 位数秒看不出跑了多久
+            self._text(msg, "⏳ %s 还在跑（已 %d 分 %02d 秒），完成后会自动回复。"
+                       % (what, elapsed // 60, elapsed % 60))
 
         return cb
 
@@ -1153,8 +1155,8 @@ if __name__ == "__main__":
 #     TIMEOUT_AGENT    3600    agent 上限（秒）。★上限≠期待值，没跑完不杀
 #     TIMEOUT_VISION   120     视觉识别超时（秒）
 #     PROGRESS_HINT    True    长任务是否发「还在跑」进度提示
-#     PROGRESS_AFTER   60      多少秒后发第一条进度提示
-#     PROGRESS_EVERY   120     之后每隔多少秒再发一条
+#     PROGRESS_AFTER   120     多少秒后发第一条进度提示（默认 2 分钟）
+#     PROGRESS_EVERY   180     之后每隔多少秒再发一条（默认 3 分钟）
 #     PROGRESS_MAX     10      单任务最多发几条进度提示
 #     AGENT_MAX_CONCURRENT 3   同时执行的长任务上限，超出直接提示用户稍等
 #     MAX_OUT          3000    文本结果最大字符数
@@ -1441,7 +1443,8 @@ if __name__ == "__main__":
 #         3) run() 重写：输出重定向到临时文件而非管道
 #            —— 管道写满会反向阻塞子进程，且超时后 stdout 常为空；落文件随时可读。
 #         4) 超时后 start_new_session + os.killpg 按进程组杀，防 zeroclaw 变孤儿烧 token。
-#         5) 新增进度提示：PROGRESS_AFTER 秒起，每 PROGRESS_EVERY 秒发一条「还在跑」。
+#         5) 新增进度提示：PROGRESS_AFTER 秒起，每 PROGRESS_EVERY 秒发一条「还在跑」
+#            （默认 120s 首报 / 180s 一条，耗时按「分:秒」显示）。
 #         6) 新增并发上限 AGENT_MAX_CONCURRENT，超出直接提示而不是让线程无限堆积。
 #         7) 新增回复降级：_text/_md 的 SDK 回复失败时转 OpenAPI sampleText/Markdown
 #            —— sessionWebhook 有时效，长任务跑完后很可能已失效。
